@@ -1,0 +1,25 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "build",
+            "type": "shell",
+            "command": "g++",
+            "args": [
+                "-I${workspaceFolder}/src/include",
+                "-L${workspaceFolder}/src/lib",
+                "-o",
+                "${workspaceFolder}/main.exe",
+                "${workspaceFolder}/main.cpp",
+                "-lSDL2",
+                "-lmingw32",
+                "-lSDL2main"
+            ],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "problemMatcher": ["$gcc"]
+        }
+    ]
+}
