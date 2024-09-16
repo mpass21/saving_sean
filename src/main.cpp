@@ -14,9 +14,11 @@ const int MAP_HEIGHT = 20;
 const int VISIBLE_WIDTH = WIDTH / TILE_SIZE; // collumns visible on the screen
 const int VISIBLE_HEIGHT = HEIGHT / TILE_SIZE;  // 15 rows visible on screen
 const float playerSpeed = 10.0f;
-const int zombieCount = 5;
+const int zombieCount = 8;
+const float zombieDelay = 4; // Seconds
+const int zombieSpeed = 100;
 std::map<std::tuple<int,int>,Uint64> flames;
-std::vector<Zombie> zombies;
+
 
 struct Character {
     int x, y;
@@ -41,6 +43,7 @@ struct Character {
 };
 
 struct Zombie : public Character {
+    Zombie() : Character() {}
     Zombie(int startX, int startY, int delay, int startHealth) {
         x = startX;
         y = startY;
@@ -76,10 +79,13 @@ struct Zombie : public Character {
         counter++;
     }
 };
+//zombie holding datastructure
+std::vector<Zombie> zombies;
 
 struct Player : public Character{
     int flameDuration = 3;
 
+    Player() : Character(), flameDuration(3) {}
     Player( int startX, int startY, int delay, int startHealth) {
         x = startX;
         y = startY;
@@ -105,7 +111,7 @@ struct Player : public Character{
         Uint64 currentTime = SDL_GetTicks64();
 
         for (auto i = flames.begin(); i != flames.end(); ) {
-            if (currentTime - i->second >= 8000) { 
+            if (currentTime - i->second >= 4000) { 
                 removeFlame(tilemap, i->first); 
                 i = flames.erase(i);
             } else {
@@ -117,9 +123,16 @@ struct Player : public Character{
 };
 
 void pushZombie() {
-    int zombieY = rand() % MAP_HEIGHT;
 
-    Zombie z = {0, zombieY, 300, 0};
+    int zombieSpawn = rand() % 49;
+    Zombie z;
+
+    if (zombieSpawn > 19) {
+        z = {zombieSpawn-19, 0, zombieSpeed, 0};
+    } else {
+        z = {0, zombieSpawn, zombieSpeed, 0};
+    }
+
     zombies.push_back(z);
 }
 
@@ -211,8 +224,10 @@ int main(int argc, char *argv[]) {
     Uint32 lastTime = SDL_GetTicks64();
     float deltaTime = 0;
 
+    Uint32 zLastTime = SDL_GetTicks64();
+    float zDeltaTime = 0;
+
     // Creating characters
-    Zombie zombie = {0, VISIBLE_HEIGHT /2, 300, 0};
     Player sean = {10, VISIBLE_HEIGHT - 2, 500, 0};
     Player player = { VISIBLE_WIDTH/2, VISIBLE_HEIGHT/2, 0, 0 };
 
@@ -235,24 +250,31 @@ int main(int argc, char *argv[]) {
         SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
         SDL_RenderClear(renderer);
 
-        // End game if player reaches Sean
-        if (sean.x == zombie.x && sean.y == zombie.y) running = false;
-
         // Checking to see if sean reached the end of the map
         if (sean.x == VISIBLE_WIDTH - 1 && !gameWon) {
-            gameWon = true;  // Set the gameWon flag to true
+            gameWon = true; 
+        }
 
-            // Update the tilemap to make all tiles water
-            for (int x = 0; x < MAP_WIDTH; x++) {
-                for (int y = 0; y < MAP_HEIGHT; y++) {
-                    tilemap[x][y] = 2;  // Set to water tile
-                }
-            }
+        Uint32 zCurrentTime = SDL_GetTicks64();
+        zDeltaTime = (zCurrentTime - zLastTime) / 1000.0f;
+        
+
+        // Handling Zombie generation
+        if ((zombies.size() < zombieCount) && (zDeltaTime >= zombieDelay) && playerMoved) {
+            pushZombie();
+            zLastTime = zCurrentTime;
         }
         // Move bot to the right if player has moved
         if (playerMoved) { 
+
             sean.move(VISIBLE_WIDTH-1, VISIBLE_HEIGHT/2);
-            zombie.move(sean.x, sean.y, tilemap);
+
+            //Moving the zombies
+            for (auto it =zombies.begin(); it != zombies.end();) {
+                it->move(sean.x,sean.y, tilemap);
+                it++;
+            }
+
         }
 
         // Calculating the time
@@ -332,15 +354,17 @@ int main(int argc, char *argv[]) {
             SDL_SetRenderDrawColor(renderer, 255, 0, 0, 255); // red color for player
             SDL_RenderFillRect(renderer, &playerRect);
 
-            // Draw zombie
-            SDL_Rect zombieRect = {zombie.x * TILE_SIZE, zombie.y * TILE_SIZE, TILE_SIZE, TILE_SIZE};
-            SDL_SetRenderDrawColor(renderer, 0, 255, 0, 255); // green color for zombie
-            SDL_RenderFillRect(renderer, &zombieRect);
 
-            // Drawing zombies
-            //for (auto it =zombies.begin(); it != zombies.end();) {
 
-            //}
+            // Drawing zombies and checking to see if they have reached sean
+            for (auto it =zombies.begin(); it != zombies.end();) {
+                if (it->x == sean.x && it->y == sean.y) running = false;
+
+                SDL_Rect zombieRect = {it->x * TILE_SIZE, it->y * TILE_SIZE, TILE_SIZE, TILE_SIZE};
+                SDL_SetRenderDrawColor(renderer, 0, 255, 0, 255); // green color for zombie
+                SDL_RenderFillRect(renderer, &zombieRect);
+                it++;
+            }
 
             // Draw sean
             SDL_Rect seanRect = {sean.x * TILE_SIZE, sean.y * TILE_SIZE, TILE_SIZE, TILE_SIZE};
